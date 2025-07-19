@@ -1,0 +1,238 @@
+<script>
+    var pickerApiLoaded = false;
+
+    function onApiLoad() {
+        google.script.url.getLocation(function (location) {
+            if (
+                location.parameter.sheetName &&
+                location.parameter.fileId &&
+                location.parameter.startIndex &&
+                location.parameter.endIndex &&
+                location.parameter.pdf
+            ) {
+                const pdf = location.parameter.pdf;
+                const sheetName = location.parameter.sheetName;
+                const fileId = location.parameter.fileId;
+                const startIndex = location.parameter.startIndex;
+                const endIndex = location.parameter.endIndex;
+
+                document.getElementById("message").textContent =
+                    "Creating new pdf's, please wait a few minutes...";
+
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(successMessagePDF)
+                    .addValuesFunction(sheetName, fileId, startIndex, endIndex, pdf);
+            } else if (
+                location.parameter.sheetName &&
+                location.parameter.fileId &&
+                location.parameter.startIndex &&
+                location.parameter.endIndex
+            ) {
+                const sheetName = location.parameter.sheetName;
+                const fileId = location.parameter.fileId;
+                const startIndex = location.parameter.startIndex;
+                const endIndex = location.parameter.endIndex;
+
+                document.getElementById("message").textContent =
+                    "Creating new letters, please wait a few minutes...";
+
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(successMessage)
+                    .addValuesFunction(sheetName, fileId, startIndex, endIndex);
+            } else if (
+                location.parameter.sheetName &&
+                location.parameter.fileId &&
+                location.parameter.field &&
+                location.parameter.startIndex &&
+                location.parameter.endIndex
+            ) {
+                //add logic here
+                const sheetName = location.parameter.sheetName;
+                const fileId = location.parameter.fileId;
+                const startIndex = location.parameter.startIndex;
+                const endIndex = location.parameter.endIndex;
+                const field = location.parameter.field;
+
+                document.getElementById("message").textContent =
+                    "Creating new letters, please wait a few minutes...";
+
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(successMessage)
+                    .addValuesFunction(sheetName, fileId, startIndex, endIndex);
+            } else if (
+                location.parameter.sheetName &&
+                location.parameter.fileId &&
+                location.parameter.field
+            ) {
+                const sheetName = location.parameter.sheetName;
+                const fileId = location.parameter.fileId;
+                const field = location.parameter.field;
+
+                document.getElementById("message").textContent =
+                    "Creating new letters, please wait a few minutes...";
+
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(successMessage)
+                    .addValuesFunction(sheetName, fileId, undefined, undefined, field);
+            } else if (
+                location.parameter.pdf &&
+                location.parameter.sheetName &&
+                location.parameter.fileId
+            ) {
+                const sheetName = location.parameter.sheetName;
+                const fileId = location.parameter.fileId;
+                const pdf = location.parameter.pdf;
+
+                document.getElementById("message").textContent =
+                    "Creating new pdf's, please wait a few minutes...";
+
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(successMessagePDF)
+                    .addValuesFunction(sheetName, fileId, undefined, undefined, pdf);
+            } else if (location.parameter.sheetName && location.parameter.fileId) {
+                const sheetName = location.parameter.sheetName;
+                const fileId = location.parameter.fileId;
+
+                document.getElementById("message").textContent =
+                    "Creating new letters, please wait a few minutes...";
+
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(successMessage)
+                    .addValuesFunction(sheetName, fileId, undefined, undefined);
+            } else {
+                gapi.load("picker", {
+                    callback: function () {
+                        pickerApiLoaded = true;
+                    },
+                });
+
+                //Draw OAuth token and Developer key from the server.
+                //If success runs createPicker()
+                google.script.run
+                    .withFailureHandler(errorMessage)
+                    .withSuccessHandler(createPicker)
+                    .pickerConfig();
+            }
+        });
+    }
+
+    function successMessage() {
+        const messageElement = document.getElementById("message");
+        messageElement.innerHTML = `<p>A copy of this file has been created with new letters. Please close this window and check your folder</p>`;
+    }
+
+    function successMessagePDF() {
+        const messageElement = document.getElementById("message");
+        messageElement.innerHTML = `<p>PDF files with new letters have been created. Please close this window and check your <a href="https://drive.google.com/drive/my-drive">Drive</a></p>`;
+    }
+
+    function createPicker(config) {
+        if (pickerApiLoaded && config.oauthToken) {
+            var DIALOG_DIMENSIONS = {width: 750, height: 580};
+
+            //Picker UI layout preferences.
+            const view = new google.picker.DocsView()
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(true)
+                .setLabel("My Drive")
+                .setOwnedByMe(true)
+                .setMode(google.picker.DocsViewMode.LIST)
+                .setMimeTypes("application/vnd.google-apps.spreadsheet")
+                .setParent("root");
+
+            const sharedDriveView = new google.picker.DocsView(
+                google.picker.ViewId.SHARED_DRIVE
+            )
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(true)
+                .setLabel("Shared Drives")
+                //.setNavHidden(false) // Show the folder hierarchy
+                .setEnableDrives(true)
+                .setMode(google.picker.DocsViewMode.LIST) // Set the view to list mode for better folder navigation
+                .setMimeTypes("application/vnd.google-apps.spreadsheet");
+
+            //Builds the picker
+            const picker = new google.picker.PickerBuilder()
+                .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                .hideTitleBar()
+                .setOAuthToken(config.oauthToken)
+                .addView(view)
+                .addView(sharedDriveView)
+                .setDeveloperKey(config.developerKey)
+                .setOrigin(google.script.host.origin)
+                .setSize(DIALOG_DIMENSIONS.width, DIALOG_DIMENSIONS.height)
+                .setCallback(pickerCallback)
+                .build();
+
+            picker.setVisible(true);
+        }
+        // Clear the config variable to hide it from users.
+        config = null;
+    }
+
+    // A simple callback implementation.
+    function pickerCallback(data) {
+        if (data.action == google.picker.Action.PICKED) {
+            // Just grab the url, name, id and type
+            let filesAndFolders = data.docs.map((doc) => {
+                return {
+                    url: doc.url,
+                    name: doc.name,
+                    id: doc.id,
+                    type: doc.type,
+                };
+            });
+
+            google.script.run
+                .withFailureHandler(errorMessage)
+                .withSuccessHandler(closeWebAppWindow)
+                .storeDriveSelections(filesAndFolders);
+        } else if (data.action == google.picker.Action.CANCEL) {
+            closeWebAppWindow();
+        }
+    }
+
+    /**
+     * Closes webapp.
+     */
+    function closeWebAppWindow() {
+        return window.top.close();
+    }
+
+    function errorMessage(e) {
+        console.error("log errrror:" + e);
+        const messageElement = document.getElementById("message");
+
+        // // Check if the error is an object with logs
+        // if (typeof e === 'object' && e !== null && e.logs) {
+        //     // Create a formatted display of logs
+            let logHtml = '<h3>Error: ' + e.error + '</h3>';
+            logHtml += '<div style="max-height: 400px; overflow-y: auto; background-color: #f1f1f1; padding: 10px; border-radius: 5px;">';
+            logHtml += '<pre style="white-space: pre-wrap; font-family: monospace;">';
+
+            // Add all log entries
+            e.logs.forEach(log => {
+                // Highlight errors in red
+                if (log.includes('ERROR:')) {
+                    logHtml += '<span style="color: red; font-weight: bold;">' + log + '</span>\n';
+                } else {
+                    logHtml += log + '\n';
+                }
+            });
+
+            logHtml += '</pre></div>';
+            logHtml += '<p>Please close this window and check your merge fields match your spreadsheet headers exactly.</p>';
+
+            messageElement.innerHTML = logHtml;
+        // } else {
+        //     // Handle regular string errors
+        //     messageElement.innerHTML = e;
+        // }
+    }
+</script>

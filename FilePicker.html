@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css" />
+
+  <?!= include("JS"); ?>
+    
+  <style>
+    /* Center the message text and create black background. */
+    body{
+      background-color: grey;
+    }
+    #message{
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+    }
+    /* Style for the tables */
+    .myTable {
+      font-size: 1.2em; /* Change the font size */
+      font-family: Arial, sans-serif; /* Change the font family */
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1em;
+      background-color: #f9f9f9; /* Change the background color */
+    }
+    /* Style for the table header */
+    .myTable th {
+      background-color: #333;
+      color: white;
+      font-weight: bold;
+      text-align: left;
+      padding: 12px;
+    }
+    /* Style for the table cells */
+    .myTable td {
+      border: 1px solid #ddd;
+      padding: 8px;
+    }
+    /* Style for the table rows */
+    .myTable tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+    /* Style for the table rows on hover */
+    .myTable tr:hover {
+      background-color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <div>
+
+    <table id="fileTable" class="myTable"></table>
+    <table id='tableContainer' class="myTable"></table>
+
+    <div>
+
+      <!-- Provide either a processing messag or any relevant error messages.  -->
+      <div id="message" class="current">Loading Google Drive Files...</div> 
+    
+    </div>
+
+
+  </div>
+
+  <!-- Load the Google API Loader script. -->
+  <script type="text/javascript" src="https://apis.google.com/js/api.js?onload=onApiLoad"></script>
+</body>
+</html>

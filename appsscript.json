@@ -1,0 +1,52 @@
+{
+  "timeZone": "Europe/Lisbon",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "urlFetchWhitelist": [
+    "https://google.com/"
+  ],
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/script.locale",
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/documents"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Bulk Letters Generator",
+      "logoUrl": "https://i.postimg.cc/Jz1RWCfB/TRA-220-x-140-px-48-x-48-px-20.png",
+      "layoutProperties": {
+        "primaryColor": "#FFDE00",
+        "secondaryColor": "#D1E3F8"
+      },
+      "useLocaleFromApp": true,
+      "universalActions": [
+        {
+          "label": "User Manual",
+          "openLink": "https://drive.google.com/file/d/1YlQ7bJO0m49xESuZ9Yg4tk1UvO1_AikA/view"
+        }
+      ]
+    },
+    "docs": {
+      "homepageTrigger": {
+        "runFunction": "onhomepage"
+      }
+    }
+  },
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Drive",
+        "version": "v3",
+        "serviceId": "drive"
+      }
+    ]
+  },
+  "webapp": {
+    "executeAs": "USER_ACCESSING",
+    "access": "DOMAIN"
+  }
+}
