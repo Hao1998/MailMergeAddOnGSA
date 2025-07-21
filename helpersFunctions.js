@@ -208,7 +208,7 @@ function generatePdfs(dataObjects, templateId, startIndex, endIndex, copiedDocum
         }
 
         // Clean up
-        DriveApp.getFileById(copiedDocument.getId()).setTrashed(true);
+        DriveApp.getFileById(newDocument.getId()).setTrashed(true);
 
         return "PDF generation complete";
     } catch (error) {
@@ -250,7 +250,7 @@ function generateGoogleDoc(dataObjects, templateId, startIndex, endIndex) {
                     processFormattedParagraph(child.asParagraph(), newBody, dataObjects[x]);
                 } else if (type === DocumentApp.ElementType.TABLE) {
                     try {
-                        processFormattedTable(child.asTable(), newBody, dataObjects[x], newBody.getNumChildren());
+                        processFormattedTable(child.asTable(), newBody, dataObjects[x], j);
                     } catch (tableError) {
                         console.log("Error with table: " + tableError);
                         newBody.appendParagraph("[Table placeholder]");
