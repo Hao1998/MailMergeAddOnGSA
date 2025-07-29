@@ -91,17 +91,27 @@ function getMergeFieldsValues(e) {
         fieldsDropdown.addItem(header, header, false);
     });
 
-    var buttonSet = CardService.newButtonSet().addButton(
-        CardService.newTextButton()
-            .setText("Finish & Merge")
-            .setOnClickAction(
-                CardService.newAction()
-                    .setFunctionName("mergeAndFinish")
-                    // .setFunctionName('formatingFieldPage')
-                    .setParameters({sheetName: sheetName, fileId: fileId})
-            )
-            .setBackgroundColor("#FFDE00")
-    );
+    var buttonSet = CardService.newButtonSet()
+        .addButton(
+            CardService.newTextButton()
+                .setText("Finish & Merge")
+                .setOnClickAction(
+                    CardService.newAction()
+                        .setFunctionName("mergeAndFinish")
+                        .setParameters({sheetName: sheetName, fileId: fileId})
+                )
+                .setBackgroundColor("#FFDE00")
+        )
+        .addButton(
+            CardService.newTextButton()
+                .setText("Remove All Placeholders")
+                .setOnClickAction(
+                    CardService.newAction()
+                        .setFunctionName("removeAllPlaceholders")
+                        .setParameters({fileId: fileId})
+                )
+                .setBackgroundColor("#FF6666")
+        );
 
     var section2 = CardService.newCardSection().setHeader("Select a merge field");
 
@@ -344,4 +354,77 @@ function getFilesAndFoldersDataWidget() {
     );
 
     return CardService.newTextParagraph().setText(paragraph);
+}
+
+function removeAllPlaceholders(e) {
+    var fileId = e.parameters.fileId;
+    var doc = DocumentApp.openById(fileId);
+    var body = doc.getBody();
+
+    // Helper function to recursively remove placeholders in all elements
+    function removePlaceholdersFromElement(element) {
+        var type = element.getType();
+        if (type === DocumentApp.ElementType.PARAGRAPH) {
+            var text = element.getText();
+            if (text.includes("{{PLZ}}")){
+                console.log("{{PLZ}} placeholder found: " + text);
+            }
+            var newText = text.replace(/{{.+?}}/g, " ");
+            if (text.includes("{{PLZ}}")){
+                console.log("{{PLZ}} placeholder found new text: ", newText);
+            }
+            if (text.trim() === "") {
+                // Ignore empty/blank original text
+                return;
+            } else if (newText.trim() === "") {
+                // Remove the element if newText is empty/whitespace
+                var parent = element.getParent();
+                parent.removeChild(element);
+            } else if (text !== newText) {
+                element.setText(newText);
+            }
+        } else if (type === DocumentApp.ElementType.TABLE) {
+            var table = element.asTable();
+            console.log("Processing table with " + table.getNumRows() + " rows.")
+            for (var r = 0; r < table.getNumRows(); r++) {
+                var row = table.getRow(r);
+                for (var c = 0; c < row.getNumCells(); c++) {
+                    console.log("Processing cell at row " + r + ", column " + c);
+                    var cell = row.getCell(c);
+                    console.log("Cell text before: " + cell.getText());
+                    console.log("Cell text getNumChildren: " + cell.getNumChildren());
+                    for (var p = 0; p < cell.getNumChildren(); p++) {
+                        console.log("Processing child element at index " + p + " value: " + cell.getChild(p).getText());
+                        removePlaceholdersFromElement(cell.getChild(p));
+                    }
+                }
+            }
+        } else if (type === DocumentApp.ElementType.LIST_ITEM) {
+            var text = element.getText();
+            var newText = text.replace(/{{.+?}}/g, " ");
+            if (text.trim() === "") {
+                return;
+            } else if (newText.trim() === "") {
+                var parent = element.getParent();
+                parent.removeChild(element);
+            } else if (text !== newText) {
+                element.setText(newText);
+            }
+        } else if (element.getNumChildren && element.getNumChildren() > 0) {
+            // Recursively process children
+            // Note: iterate backwards to safely remove children
+            for (var i = element.getNumChildren() - 1; i >= 0; i--) {
+                removePlaceholdersFromElement(element.getChild(i));
+            }
+        }
+    }
+
+    removePlaceholdersFromElement(body);
+    doc.saveAndClose();
+    var card = CardService.newCardBuilder()
+        .setHeader(CardService.newCardHeader().setTitle("All placeholders removed!"))
+        .addSection(CardService.newCardSection().addWidget(
+            CardService.newTextParagraph().setText("All placeholders have been removed from the document, including inside tables.")
+        ));
+    return CardService.newNavigation().updateCard(card.build());
 }
