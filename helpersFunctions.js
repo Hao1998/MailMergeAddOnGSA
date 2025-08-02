@@ -131,9 +131,7 @@ function copyAndUpdateDoc2(dataObjects, fileId, startIndex, endIndex, pdf) {
             return generateGoogleDoc(dataObjects, newDocumentId, startIndex, endIndex);
         }
     } catch (error) {
-        console.log("ERROR in copyAndUpdateDoc2: " + error.toString());
-        throw error;
-        //throw new Error("Document processing failed: " + error.message);
+        throw new Error(error && error.message ? error.message : String(error));
     }
 }
 
@@ -212,10 +210,7 @@ function generatePdfs(dataObjects, templateId, startIndex, endIndex, copiedDocum
 
         return "PDF generation complete";
     } catch (error) {
-        console.log("ERROR childType: " + JSON.stringify(currentChildType));
-        console.log("ERROR in generatePdfs: " + error.toString());
-        console.log("Stack trace: " + (error.stack || "No stack trace available"));
-        throw error;
+        throw new Error(error && error.message ? error.message : String(error));
     }
 }
 
@@ -272,8 +267,7 @@ function generateGoogleDoc(dataObjects, templateId, startIndex, endIndex) {
         }
         return newDocIds;
     } catch (error) {
-        console.log("ERROR in generateGoogleDoc: " + error.toString());
-        throw error;
+        throw new Error(error && error.message ? error.message : String(error));
     }
 }
 
@@ -338,8 +332,7 @@ function processFormattedTable(sourceTable, targetBody, dataObject, index) {
         var newTable = targetBody.insertTable(index, tableCopy);
         return newTable;
     } catch (error) {
-        console.log("Error processing formatted table: " + error);
-        throw error;
+        throw new Error(error && error.message ? error.message : String(error));
     }
 }
 
@@ -568,9 +561,7 @@ function processFormattedParagraph(sourceParagraph, targetBody, dataObject) {
         }
         return newParagraph;
     } catch (error) {
-        console.log("Error processing formatted paragraph: " + error);
-        console.log("Stack: " + (error.stack || "No stack trace"));
-        throw error;
+        throw new Error(error && error.message ? error.message : String(error));
     }
 }
 
@@ -590,3 +581,4 @@ function removeEmptyFirstParagraph(targetBody) {
         console.log("Error removing empty first paragraph: " + error);
     }
 }
+

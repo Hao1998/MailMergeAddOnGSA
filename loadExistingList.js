@@ -392,10 +392,14 @@ function removeAllPlaceholders(e) {
                     console.log("Processing cell at row " + r + ", column " + c);
                     var cell = row.getCell(c);
                     console.log("Cell text before: " + cell.getText());
-                    console.log("Cell text getNumChildren: " + cell.getNumChildren());
+
+                    // Process each child element in the cell (usually paragraphs)
                     for (var p = 0; p < cell.getNumChildren(); p++) {
-                        console.log("Processing child element at index " + p + " value: " + cell.getChild(p).getText());
-                        removePlaceholdersFromElement(cell.getChild(p));
+                        var childElement = cell.getChild(p);
+                        console.log("Processing child element at index " + p + " type: " + childElement.getType());
+
+                        // Recursively process the child element (this handles paragraphs and their text)
+                        removePlaceholdersFromElement(childElement);
                     }
                 }
             }

@@ -206,33 +206,10 @@
     }
 
     function errorMessage(e) {
-        console.error("log errrror:" + e);
+        console.log("asdasdsadError", e);
         const messageElement = document.getElementById("message");
-
-        // // Check if the error is an object with logs
-        // if (typeof e === 'object' && e !== null && e.logs) {
-        //     // Create a formatted display of logs
-            let logHtml = '<h3>Error: ' + e.error + '</h3>';
-            logHtml += '<div style="max-height: 400px; overflow-y: auto; background-color: #f1f1f1; padding: 10px; border-radius: 5px;">';
-            logHtml += '<pre style="white-space: pre-wrap; font-family: monospace;">';
-
-            // Add all log entries
-            e.logs.forEach(log => {
-                // Highlight errors in red
-                if (log.includes('ERROR:')) {
-                    logHtml += '<span style="color: red; font-weight: bold;">' + log + '</span>\n';
-                } else {
-                    logHtml += log + '\n';
-                }
-            });
-
-            logHtml += '</pre></div>';
-            logHtml += '<p>Please close this window and check your merge fields match your spreadsheet headers exactly.</p>';
-
-            messageElement.innerHTML = logHtml;
-        // } else {
-        //     // Handle regular string errors
-        //     messageElement.innerHTML = e;
-        // }
+        // Handle structured error objects with logs
+        const filtered = e.toString().replace('ScriptError:', '').trim();
+        messageElement.innerHTML = `<pre>${filtered}</pre><p>Please close this window and check your merge fields match your spreadsheet headers exactly.</p>`;
     }
 </script>
