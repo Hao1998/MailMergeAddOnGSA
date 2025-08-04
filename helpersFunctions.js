@@ -148,66 +148,43 @@ function generatePdfs(dataObjects, templateId, startIndex, endIndex, copiedDocum
     var templateDoc = DocumentApp.openById(templateId);
     var body = templateDoc.getBody();
     var numChildren = body.getNumChildren();
-    var currentChildType = null;
-
     try {
+        // Preprocess template children into JS objects for faster access
+        var templateElements = [];
+        for (var j = 0; j < numChildren; j++) {
+            var child = body.getChild(j);
+            var type = child.getType();
+            if (type === DocumentApp.ElementType.PARAGRAPH) {
+                templateElements.push({type: 'paragraph', element: child.copy()});
+            } else if (type === DocumentApp.ElementType.TABLE) {
+                templateElements.push({type: 'table', element: child.copy()});
+            }
+        }
         for (var x = startIndex; x <= endIndex; x++) {
-            // Get identifier for file naming
             var firstPropertyValue = Object.values(dataObjects[x][0])[0];
-
-            // Create a new document for each record
             var newDocument = DocumentApp.create("Merged Letter " + firstPropertyValue);
             var newDocumentBody = newDocument.getBody();
-
-
             newDocumentBody.setAttributes(body.getAttributes());
-            // Process all elements from template
-            for (var j = 0; j < numChildren; j++) {
-                var child = body.getChild(j);
-                currentChildType = child.getType();
-                var paragraphVisited = false;
-                if (currentChildType === DocumentApp.ElementType.PARAGRAPH) {
-                    // Use the enhanced paragraph processor to preserve formatting
-                    processFormattedParagraph(child.asParagraph(), newDocumentBody, dataObjects[x]);
-                } else if (currentChildType === DocumentApp.ElementType.TABLE) {
+            // Use preprocessed template elements
+            for (var k = 0; k < templateElements.length; k++) {
+                var item = templateElements[k];
+                if (item.type === 'paragraph') {
+                    processFormattedParagraph(item.element.asParagraph(), newDocumentBody, dataObjects[x]);
+                } else if (item.type === 'table') {
                     try {
-                        processFormattedTable(child.asTable(), newDocumentBody, dataObjects[x], j)
+                        processFormattedTable(item.element.asTable(), newDocumentBody, dataObjects[x], k);
                     } catch (tableError) {
-                        console.log("Error with table: " + tableError);
                         newDocumentBody.appendParagraph("[Table placeholder]");
                     }
-                } else {
-                    console.log("Skipping unsupported element type: " + currentChildType);
                 }
             }
-
-            // Apply table padding adjustments
-            // changePaddings(newDocumentBody, 0, 0);
-            // Remove empty first paragraph if it exists
-            // Save document
-            //removeEmptyFirstParagraph(newDocumentBody);
+            removeEmptyFirstParagraph(newDocumentBody);
             newDocument.saveAndClose();
-
-            // Get parent folder for PDF output
             var parentFolder = DriveApp.getFileById(newDocument.getId()).getParents().next();
-
-            // Add delay to avoid rate limits
-            Utilities.sleep(1000);
-
-            // Convert to PDF
             var pdfBlob = DriveApp.getFileById(newDocument.getId()).getAs("application/pdf");
             parentFolder.createFile(pdfBlob);
-
-            // Clean up temporary document
             DriveApp.getFileById(newDocument.getId()).setTrashed(true);
-
-            // Add delay between operations
-            Utilities.sleep(1000);
         }
-
-        // Clean up
-        DriveApp.getFileById(newDocument.getId()).setTrashed(true);
-
         return "PDF generation complete";
     } catch (error) {
         throw new Error(error && error.message ? error.message : String(error));
@@ -224,44 +201,40 @@ function generatePdfs(dataObjects, templateId, startIndex, endIndex, copiedDocum
  */
 function generateGoogleDoc(dataObjects, templateId, startIndex, endIndex) {
     var templateDoc = DocumentApp.openById(templateId);
-    var templateBody = templateDoc.getBody().copy();
+    var templateBody = templateDoc.getBody();
     var numChildren = templateBody.getNumChildren();
-    var batchSize = 30;
+    // Preprocess template children into JS objects for faster access
+    var templateElements = [];
+    for (var j = 0; j < numChildren; j++) {
+        var child = templateBody.getChild(j);
+        var type = child.getType();
+        if (type === DocumentApp.ElementType.PARAGRAPH) {
+            templateElements.push({type: 'paragraph', element: child.copy()});
+        } else if (type === DocumentApp.ElementType.TABLE) {
+            templateElements.push({type: 'table', element: child.copy()});
+        }
+    }
     var newDocIds = [];
-
     try {
         for (var x = startIndex; x <= endIndex; x++) {
-            // Get identifier for file naming
             var firstPropertyValue = Object.values(dataObjects[x][0])[0];
-            // Create a new document for each record
             var newDocument = DocumentApp.create("Merged Letter " + firstPropertyValue);
             var newBody = newDocument.getBody();
             newBody.setAttributes(templateBody.getAttributes());
-
-            for (var j = 0; j < numChildren; j++) {
-                var child = templateBody.getChild(j);
-                var type = child.getType();
-                if (type === DocumentApp.ElementType.PARAGRAPH) {
-                    processFormattedParagraph(child.asParagraph(), newBody, dataObjects[x]);
-                } else if (type === DocumentApp.ElementType.TABLE) {
+            // Use preprocessed template elements
+            for (var k = 0; k < templateElements.length; k++) {
+                var item = templateElements[k];
+                if (item.type === 'paragraph') {
+                    processFormattedParagraph(item.element.asParagraph(), newBody, dataObjects[x]);
+                } else if (item.type === 'table') {
                     try {
-                        processFormattedTable(child.asTable(), newBody, dataObjects[x], j);
+                        processFormattedTable(item.element.asTable(), newBody, dataObjects[x], k);
                     } catch (tableError) {
-                        console.log("Error with table: " + tableError);
                         newBody.appendParagraph("[Table placeholder]");
                     }
-                } else {
-                    console.log("Skipping unsupported element type: " + type);
-                }
-                removeEmptyFirstParagraph(newBody);
-                // Save changes in batches to avoid timeout
-                if (j > 0 && j % batchSize === 0) {
-                    newDocument.saveAndClose();
-                    newDocument = DocumentApp.openById(newDocument.getId());
-                    newBody = newDocument.getBody();
                 }
             }
-
+            removeEmptyFirstParagraph(newBody);
             newDocument.saveAndClose();
             newDocIds.push(newDocument.getId());
         }
@@ -338,36 +311,6 @@ function processFormattedTable(sourceTable, targetBody, dataObject, index) {
 
 function escapeRegexChars(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
-* Get the string representing the given PositionedLayout enum.
-* @param {PositionedLayout} PositionedLayout - Enum value.
-* @returns {String} English text matching enum.
-*/
-function getLayoutString(PositionedLayout) {
-    var layout;
-    switch (PositionedLayout) {
-        case DocumentApp.PositionedLayout.ABOVE_TEXT:
-            layout = "ABOVE_TEXT";
-            break;
-        case DocumentApp.PositionedLayout.BREAK_BOTH:
-            layout = "BREAK_BOTH";
-            break;
-        case DocumentApp.PositionedLayout.BREAK_LEFT:
-            layout = "BREAK_LEFT";
-            break;
-        case DocumentApp.PositionedLayout.BREAK_RIGHT:
-            layout = "BREAK_RIGHT";
-            break;
-        case DocumentApp.PositionedLayout.WRAP_TEXT:
-            layout = "WRAP_TEXT";
-            break;
-        default:
-            layout = "UNKNOWN";
-            break;
-    }
-    return layout;
 }
 
 /**
@@ -581,4 +524,3 @@ function removeEmptyFirstParagraph(targetBody) {
         console.log("Error removing empty first paragraph: " + error);
     }
 }
-
