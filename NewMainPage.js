@@ -92,7 +92,21 @@ function getMergeFieldsWidget() {
     )
     .setBackgroundColor("#FFDE00");
 
-  section1.addWidget(sheetDropdown).addWidget(nextBtn);
+  var fileId = PropertiesService.getUserProperties().getProperty("fileId") || null;
+  var removePlaceholdersBtn = CardService.newTextButton()
+    .setText("Remove All Placeholders")
+    .setOnClickAction(
+      CardService.newAction()
+        .setFunctionName("removeAllPlaceholders")
+        .setParameters({ fileId: fileId })
+    )
+    .setBackgroundColor("#FFDE00");
+
+  var buttonSet = CardService.newButtonSet()
+    .addButton(nextBtn)
+    .addButton(removePlaceholdersBtn);
+
+  section1.addWidget(sheetDropdown).addWidget(buttonSet);
   card4.addSection(section1);
 
   return CardService.newNavigation().pushCard(card4.build());

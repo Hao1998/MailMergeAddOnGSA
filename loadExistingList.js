@@ -110,7 +110,7 @@ function getMergeFieldsValues(e) {
                         .setFunctionName("removeAllPlaceholders")
                         .setParameters({fileId: fileId})
                 )
-                .setBackgroundColor("#FF6666")
+                .setBackgroundColor("#FFDE00")
         );
 
     var section2 = CardService.newCardSection().setHeader("Select a merge field");
@@ -357,8 +357,7 @@ function getFilesAndFoldersDataWidget() {
 }
 
 function removeAllPlaceholders(e) {
-    var fileId = e.parameters.fileId;
-    var doc = DocumentApp.openById(fileId);
+    var doc = DocumentApp.getActiveDocument();
     var body = doc.getBody();
 
     // Helper function to recursively remove placeholders in all elements
