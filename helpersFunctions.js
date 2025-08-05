@@ -361,151 +361,266 @@ function formatDate(dateObj) {
     );
 }
 
-/**
- * Processes a paragraph and preserves its formatting, handling cross-document copying
- * @param {GoogleAppsScript.Document.Paragraph} sourceParagraph - The original paragraph
- * @param {GoogleAppsScript.Document.Body} targetBody - The target document body
- * @param {Object} dataObject - Data for replacements
- * @returns {Paragraph} The new paragraph in the target document
- */
 function processFormattedParagraph(sourceParagraph, targetBody, dataObject) {
     try {
         var newParagraph = targetBody.appendParagraph('');
         var paragraphAttributes = sourceParagraph.getAttributes();
-        // console.log("=== PARAGRAPH ATTRIBUTES ===");
-        // console.log("Source paragraph attributes:", JSON.stringify(paragraphAttributes, null, 2));
+
         if (paragraphAttributes[DocumentApp.Attribute.FONT_SIZE]) {
             console.log("Source paragraph FONT_SIZE:", paragraphAttributes[DocumentApp.Attribute.FONT_SIZE]);
         }
         newParagraph.setAttributes(paragraphAttributes);
-        // Process all child elements from the original paragraph
-        var numChildren = sourceParagraph.getNumChildren();
-        // console.log("Processing " + numChildren + " child elements");
-        for (var i = 0; i < numChildren; i++) {
-            var child = sourceParagraph.getChild(i);
-            var type = child.getType();
-            if (type === DocumentApp.ElementType.TEXT) {
-                // Get the original text element
-                var sourceTextElement = child.asText();
-                var originalText = sourceTextElement.getText();
-                // console.log("=== TEXT ELEMENT ===");
-                // console.log("Original text: '" + originalText + "'");
-                // Replace placeholders if needed
-                var processedText = originalText;
-                if (dataObject && originalText.indexOf("{{") >= 0) {
-                    processedText = replacePlaceholders(originalText, dataObject);
-                    // console.log("Text after placeholder replacement: '" + processedText + "'");
-                }
-                // Add the processed text to the new paragraph
-                var appendedText = newParagraph.appendText(processedText);
-                // Now copy ALL text formatting from the original text element
-                // This is crucial for preserving font size and other text-level formatting
-                var textLength = processedText.length;
-                if (textLength > 0) {
-                    // Copy text attributes for each character/range
-                    for (var charIndex = 0; charIndex < originalText.length && charIndex < textLength; charIndex++) {
-                        try {
-                            var sourceAttributes = sourceTextElement.getAttributes(charIndex);
-                            if (sourceAttributes) {
-                                var targetIndex = Math.min(charIndex, textLength - 1);
-                                appendedText.setAttributes(targetIndex, targetIndex, sourceAttributes);
-                            }
-                        } catch (charError) {
-                            // console.log("Could not copy attributes for character " + charIndex + ": " + charError);
-                        }
-                    }
-                    // Also apply overall text formatting to the entire appended text
-                    try {
-                        var overallTextAttributes = sourceTextElement.getAttributes(0);
-                        if (overallTextAttributes) {
-                            // console.log("Overall text attributes:", JSON.stringify(overallTextAttributes, null, 2));
-                            appendedText.setAttributes(0, textLength - 1, overallTextAttributes);
-                        }
-                    } catch (overallError) {
-                        console.log("Could not apply overall text attributes: " + overallError);
-                    }
-                }
-            } else if (type === DocumentApp.ElementType.INLINE_IMAGE) {
-                // Handle inline images (your existing code is fine)
-                try {
-                    var image = child.asInlineImage().copy();
-                    var width = image.getWidth();
-                    var height = image.getHeight();
-                    var blob = image.getBlob();
-                    var newImage = newParagraph.appendInlineImage(blob);
-                    newImage.setWidth(width);
-                    newImage.setHeight(height);
-                } catch (imageError) {
-                    console.log("Error processing inline image: " + imageError);
-                    newParagraph.appendText("[Image placeholder]");
-                }
-            }
-        }
-        // Handle positioned images (your existing code is fine)
+
+        // First, identify and process positioned images (including wrap-text)
         var positionedImages = sourceParagraph.getPositionedImages();
+        var wrapTextImages = [];
+
         if (positionedImages && positionedImages.length > 0) {
-            // console.log("Processing " + positionedImages.length + " positioned images");
+            console.log("Processing " + positionedImages.length + " positioned images");
+
             for (var i = 0; i < positionedImages.length; i++) {
                 try {
                     var posImage = positionedImages[i];
-                    var width = posImage.getWidth();
-                    var height = posImage.getHeight();
-                    var blob = posImage.getBlob();
                     var layout = posImage.getLayout();
-                    var leftOffset = posImage.getLeftOffset();
-                    var topOffset = posImage.getTopOffset();
-                    var newPositionedImage = newParagraph.addPositionedImage(blob);
-                    newPositionedImage.setWidth(width);
-                    newPositionedImage.setHeight(height);
-                    newPositionedImage.setLayout(layout);
-                    newPositionedImage.setLeftOffset(leftOffset);
-                    newPositionedImage.setTopOffset(topOffset);
-                    // console.log("Successfully added positioned image with layout: " + getLayoutString(layout));
-                } catch (posImageError) {
-                    // console.log("Error processing positioned image: " + posImageError);
-                    try {
-                        var fallbackImage = newParagraph.appendInlineImage(posImage.getBlob());
-                        fallbackImage.setWidth(posImage.getWidth());
-                        fallbackImage.setHeight(posImage.getHeight());
-                        console.log("Added positioned image as inline image fallback");
-                    } catch (fallbackError) {
-                        console.log("Fallback also failed: " + fallbackError);
-                        newParagraph.appendText("[Positioned Image placeholder]");
-                    }
-                }
-            }
-        }
-        // Final check: ensure the paragraph has the correct font size for spacing
-        // This is especially important for empty or minimal text paragraphs used for spacing
-        try {
-            var finalParagraphAttributes = newParagraph.getAttributes();
-            // console.log("=== FINAL PARAGRAPH CHECK ===");
-            // console.log("Final paragraph attributes:", JSON.stringify(finalParagraphAttributes, null, 2));
-            // if (finalParagraphAttributes[DocumentApp.Attribute.FONT_SIZE]) {
-            //     console.log("Final paragraph FONT_SIZE:", finalParagraphAttributes[DocumentApp.Attribute.FONT_SIZE]);
-            // }
-            // If the paragraph is empty or has minimal text, ensure font size is preserved
-            var paragraphText = newParagraph.getText();
-            if (paragraphText.length <= 1) { // Empty or just newline character
-                var sourceParagraphAttributes = sourceParagraph.getAttributes();
-                if (sourceParagraphAttributes[DocumentApp.Attribute.FONT_SIZE]) {
-                    var fontSize = sourceParagraphAttributes[DocumentApp.Attribute.FONT_SIZE];
-                    // console.log("Ensuring font size " + fontSize + " for spacing paragraph");
-                    newParagraph.editAsText().setFontSize(fontSize);
-                }
+                    var isWrapText = (layout === DocumentApp.PositionedLayout.WRAP_TEXT);
 
-                if (sourceParagraphAttributes[DocumentApp.Attribute.UNDERLINE]) {
-                    var underLine = sourceParagraphAttributes[DocumentApp.Attribute.UNDERLINE];
-                    newParagraph.editAsText().setUnderline(underLine)
+                    console.log("Image " + i + " layout:", getLayoutString(layout), "- Wrap text:", isWrapText);
+
+                    // Store wrap-text images for special handling
+                    if (isWrapText) {
+                        wrapTextImages.push({
+                            image: posImage,
+                            index: i,
+                            layout: layout
+                        });
+                    }
+
+                    // Process the positioned image
+                    var newPositionedImage = processPositionedImage(posImage, newParagraph);
+
+                    if (isWrapText) {
+                        console.log("Successfully processed wrap-text image");
+                    }
+
+                } catch (posImageError) {
+                    console.log("Error processing positioned image: " + posImageError);
+                    handlePositionedImageFallback(posImage, newParagraph);
                 }
             }
-        } catch (finalError) {
-            console.log("Error in final paragraph check: " + finalError);
         }
+
+        // Process all child elements from the original paragraph
+        var numChildren = sourceParagraph.getNumChildren();
+        console.log("Processing " + numChildren + " child elements");
+
+        for (var i = 0; i < numChildren; i++) {
+            var child = sourceParagraph.getChild(i);
+            var type = child.getType();
+
+            if (type === DocumentApp.ElementType.TEXT) {
+                processTextElement(child, newParagraph, dataObject);
+            } else if (type === DocumentApp.ElementType.INLINE_IMAGE) {
+                processInlineImage(child, newParagraph);
+            }
+        }
+
+        // Final formatting adjustments for spacing paragraphs
+        applyFinalParagraphFormatting(sourceParagraph, newParagraph);
+
         return newParagraph;
+
     } catch (error) {
         throw new Error(error && error.message ? error.message : String(error));
     }
+}
+
+function processPositionedImage(posImage, targetParagraph) {
+    try {
+        var width = posImage.getWidth();
+        var height = posImage.getHeight();
+        var blob = posImage.getBlob();
+        var layout = posImage.getLayout();
+        var leftOffset = posImage.getLeftOffset();
+        var topOffset = posImage.getTopOffset();
+
+        var newPositionedImage = targetParagraph.addPositionedImage(blob);
+        newPositionedImage.setWidth(width);
+        newPositionedImage.setHeight(height);
+        newPositionedImage.setLayout(layout);
+        newPositionedImage.setLeftOffset(leftOffset);
+        newPositionedImage.setTopOffset(topOffset);
+
+        // Log wrap-text specific details
+        if (layout === DocumentApp.PositionedLayout.WRAP_TEXT) {
+            console.log("Wrap-text image processed - Width:", width, "Height:", height,
+                "Offsets:", leftOffset, topOffset);
+        }
+
+        return newPositionedImage;
+
+    } catch (error) {
+        console.log("Error in processPositionedImage: " + error);
+        throw error;
+    }
+}
+
+function handlePositionedImageFallback(posImage, targetParagraph) {
+    try {
+        var fallbackImage = targetParagraph.appendInlineImage(posImage.getBlob());
+        fallbackImage.setWidth(posImage.getWidth());
+        fallbackImage.setHeight(posImage.getHeight());
+        console.log("Added positioned image as inline image fallback (wrap-text lost)");
+    } catch (fallbackError) {
+        console.log("Fallback also failed: " + fallbackError);
+        targetParagraph.appendText("[Positioned Image placeholder]");
+    }
+}
+
+function processTextElement(textElement, targetParagraph, dataObject) {
+    try {
+        var sourceTextElement = textElement.asText();
+        var originalText = sourceTextElement.getText();
+
+        // Replace placeholders if needed
+        var processedText = originalText;
+        if (dataObject && originalText.indexOf("{{") >= 0) {
+            processedText = replacePlaceholders(originalText, dataObject);
+        }
+
+        // Add the processed text to the new paragraph
+        var appendedText = targetParagraph.appendText(processedText);
+
+        // Copy text formatting
+        var textLength = processedText.length;
+        if (textLength > 0) {
+            // Copy character-level attributes
+            for (var charIndex = 0; charIndex < originalText.length && charIndex < textLength; charIndex++) {
+                try {
+                    var sourceAttributes = sourceTextElement.getAttributes(charIndex);
+                    if (sourceAttributes) {
+                        var targetIndex = Math.min(charIndex, textLength - 1);
+                        appendedText.setAttributes(targetIndex, targetIndex, sourceAttributes);
+                    }
+                } catch (charError) {
+                    console.log("Could not copy attributes for character " + charIndex + ": " + charError);
+                }
+            }
+
+            // Apply overall text formatting
+            try {
+                var overallTextAttributes = sourceTextElement.getAttributes(0);
+                if (overallTextAttributes) {
+                    appendedText.setAttributes(0, textLength - 1, overallTextAttributes);
+                }
+            } catch (overallError) {
+                console.log("Could not apply overall text attributes: " + overallError);
+            }
+        }
+
+    } catch (error) {
+        console.log("Error processing text element: " + error);
+    }
+}
+
+function processInlineImage(imageElement, targetParagraph) {
+    try {
+        var image = imageElement.asInlineImage().copy();
+        var width = image.getWidth();
+        var height = image.getHeight();
+        var blob = image.getBlob();
+
+        var newImage = targetParagraph.appendInlineImage(blob);
+        newImage.setWidth(width);
+        newImage.setHeight(height);
+
+        console.log("Processed inline image (no text wrapping)");
+
+    } catch (imageError) {
+        console.log("Error processing inline image: " + imageError);
+        targetParagraph.appendText("[Image placeholder]");
+    }
+}
+
+function applyFinalParagraphFormatting(sourceParagraph, targetParagraph) {
+    try {
+        var paragraphText = targetParagraph.getText();
+        if (paragraphText.length <= 1) { // Empty or just newline character
+            var sourceParagraphAttributes = sourceParagraph.getAttributes();
+
+            if (sourceParagraphAttributes[DocumentApp.Attribute.FONT_SIZE]) {
+                var fontSize = sourceParagraphAttributes[DocumentApp.Attribute.FONT_SIZE];
+                targetParagraph.editAsText().setFontSize(fontSize);
+            }
+
+            if (sourceParagraphAttributes[DocumentApp.Attribute.UNDERLINE]) {
+                var underLine = sourceParagraphAttributes[DocumentApp.Attribute.UNDERLINE];
+                targetParagraph.editAsText().setUnderline(underLine);
+            }
+        }
+    } catch (finalError) {
+        console.log("Error in final paragraph formatting: " + finalError);
+    }
+}
+
+function getLayoutString(layout) {
+    // Helper function to convert layout enum to readable string
+    switch (layout) {
+        case DocumentApp.PositionedLayout.ABOVE_TEXT:
+            return "ABOVE_TEXT";
+        case DocumentApp.PositionedLayout.BELOW_TEXT:
+            return "BELOW_TEXT";
+        case DocumentApp.PositionedLayout.BREAK_BOTH:
+            return "BREAK_BOTH";
+        case DocumentApp.PositionedLayout.BREAK_LEFT:
+            return "BREAK_LEFT";
+        case DocumentApp.PositionedLayout.BREAK_RIGHT:
+            return "BREAK_RIGHT";
+        case DocumentApp.PositionedLayout.WRAP_TEXT:
+            return "WRAP_TEXT";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+// Utility function to analyze paragraph images for debugging
+function analyzeParagraphImages(paragraph) {
+    console.log("=== PARAGRAPH IMAGE ANALYSIS ===");
+
+    // Check inline images
+    var inlineImages = [];
+    var numChildren = paragraph.getNumChildren();
+
+    for (var i = 0; i < numChildren; i++) {
+        var child = paragraph.getChild(i);
+        if (child.getType() === DocumentApp.ElementType.INLINE_IMAGE) {
+            inlineImages.push(i);
+        }
+    }
+
+    console.log("Inline images found:", inlineImages.length);
+
+    // Check positioned images
+    var positionedImages = paragraph.getPositionedImages();
+    console.log("Positioned images found:", positionedImages ? positionedImages.length : 0);
+
+    if (positionedImages && positionedImages.length > 0) {
+        for (var i = 0; i < positionedImages.length; i++) {
+            var posImage = positionedImages[i];
+            var layout = posImage.getLayout();
+            console.log("Positioned image " + i + ":");
+            console.log("  Layout:", getLayoutString(layout));
+            console.log("  Wrap text:", layout === DocumentApp.PositionedLayout.WRAP_TEXT);
+            console.log("  Dimensions:", posImage.getWidth() + "x" + posImage.getHeight());
+            console.log("  Offsets:", posImage.getLeftOffset(), posImage.getTopOffset());
+        }
+    }
+
+    return {
+        inlineCount: inlineImages.length,
+        positionedCount: positionedImages ? positionedImages.length : 0,
+        wrapTextCount: positionedImages ?
+            positionedImages.filter(img => img.getLayout() === DocumentApp.PositionedLayout.WRAP_TEXT).length : 0
+    };
 }
 
 function removeEmptyFirstParagraph(targetBody) {
