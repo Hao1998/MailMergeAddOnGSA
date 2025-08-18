@@ -1,7 +1,6 @@
 // const URL =
 //     "https://script.google.com/a/macros/zoi.kaercher.com/s/AKfycbz14Mw-sJAjQ70eiFWifXJc3072fEIQjoLeAQtxMqel7NsTwJGs4_TfTgPkmZkI5wQ6qQ/exec";
 
-
 const URL =
     "https://script.google.com/a/macros/zoi.kaercher.com/s/AKfycbzp9Dt9RcsJyc4Ijq6Xco0HVWHII6atY6ToFbRFUr4T/dev";
 var sheetName = undefined;
