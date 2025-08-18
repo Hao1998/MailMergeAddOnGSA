@@ -77,54 +77,49 @@ function getSheetData(sheetName) {
 }
 
 function getColumnValues(headerName, sheetName) {
-    //headerName = headerName.replace(/\r?\n|\r/g, " ")
-    //console.log(`Getting column values for header: "${headerName}"`);
+    // Add caching for repeated calls
+    const cacheKey = `${sheetName}_${headerName}_values`;
+    const cache = CacheService.getUserCache();
+    const cachedValues = cache.get(cacheKey);
+
+    if (cachedValues) {
+        return JSON.parse(cachedValues);
+    }
+
     const spreadsheetId = JSON.parse(PropertiesService.getUserProperties().getProperty('fileId'));
-    //console.log(`Spreadsheet ID: ${spreadsheetId}`);
     const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
-    //console.log(`Sheet name: ${sheetName}, exists: ${sheet !== null}`);
 
     if (!sheet) {
-        //console.error(`Sheet "${sheetName}" not found in spreadsheet!`);
         throw new Error(`Sheet "${sheetName}" not found in spreadsheet.`);
     }
 
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    // console.log(`Headers found (${headers.length})`);
-    // Log each header with its index for clarity
-    // Process headers to handle number conversion
-    const processedHeaders = headers.map((header, index) => {
-        let processedHeader = header;
+    // Get all data at once instead of reading headers separately
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    const allData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
 
-        //Convert floating point numbers back to integers for matching
+    // Process headers in first row
+    const headers = allData[0].map((header, index) => {
         if (typeof header === 'number' && header % 1 === 0) {
-            // console.log("getColumnValues: ")
-            processedHeader = Math.round(header).toString();
+            return Math.round(header).toString();
         }
-
-        // console.log(`Header[${index+1}] original: "${header}" (${typeof header}), processed: "${processedHeader}"`);
-        return processedHeader;
+        return header;
     });
 
-    // console.log(`Looking for header: "${headerName}"`);
-    const columnIndex = processedHeaders.indexOf(headerName) + 1;
-    //console.log(`Column index for "${headerName}": ${columnIndex}`);
-
-    if (columnIndex < 1) {
-        //console.error(`Header "${headerName}" not found in spreadsheet headers!`);
-        throw new Error(`Header "${headerName}" not found in spreadsheet headers!`)
+    const columnIndex = headers.indexOf(headerName);
+    if (columnIndex === -1) {
+        throw new Error(`Header "${headerName}" not found in spreadsheet headers!`);
     }
 
-    const range = sheet.getRange(2, columnIndex, sheet.getLastRow() - 1, 1);
-    const values = range.getValues().map(function (row) {
-        return row[0];
-    });
-    //console.log(`Retrieved ${values.length} values from column ${columnIndex}`);
-    const nonEmptyValues = values.filter(function (value) {
-        return value !== "";
-    });
-    //console.log(nonEmptyValues)
-    return nonEmptyValues;
+    // Extract column values efficiently
+    const values = allData.slice(1) // Skip header row
+        .map(row => row[columnIndex])
+        .filter(value => value !== "");
+
+    // Cache the results for 6 minutes
+    cache.put(cacheKey, JSON.stringify(values), 360);
+
+    return values;
 }
 
 

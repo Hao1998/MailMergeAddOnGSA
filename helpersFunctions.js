@@ -148,47 +148,82 @@ function generatePdfs(dataObjects, templateId, startIndex, endIndex, copiedDocum
     var templateDoc = DocumentApp.openById(templateId);
     var body = templateDoc.getBody();
     var numChildren = body.getNumChildren();
+
     try {
-        // Preprocess template children into JS objects for faster access
-        var templateElements = [];
-        for (var j = 0; j < numChildren; j++) {
-            var child = body.getChild(j);
-            var type = child.getType();
-            if (type === DocumentApp.ElementType.PARAGRAPH) {
-                templateElements.push({type: 'paragraph', element: child.copy()});
-            } else if (type === DocumentApp.ElementType.TABLE) {
-                templateElements.push({type: 'table', element: child.copy()});
+        // Create a folder to store all PDFs
+        var folder = DriveApp.createFolder('Merged_Letters_' + new Date().getTime());
+
+        // Preprocess template elements once
+        var templateElements = preprocessTemplateElements(body, numChildren);
+
+        // Process documents in batches of 10
+        const BATCH_SIZE = 10;
+        for (var x = startIndex; x <= endIndex; x += BATCH_SIZE) {
+            var batchEnd = Math.min(x + BATCH_SIZE - 1, endIndex);
+            var batchPromises = [];
+
+            for (var i = x; i <= batchEnd; i++) {
+                var firstPropertyValue = Object.values(dataObjects[i][0])[0];
+                var newDocument = DocumentApp.create("Merged Letter " + firstPropertyValue);
+                var newDocumentBody = newDocument.getBody();
+                newDocumentBody.setAttributes(body.getAttributes());
+
+                // Process all template elements for this document
+                processTemplateElementsBatch(templateElements, newDocumentBody, dataObjects[i]);
+
+                removeEmptyFirstParagraph(newDocumentBody);
+                newDocument.saveAndClose();
+
+                // Convert to PDF and clean up
+                var docFile = DriveApp.getFileById(newDocument.getId());
+                var pdfBlob = docFile.getAs("application/pdf");
+                folder.createFile(pdfBlob.setName("Merged Letter " + firstPropertyValue + ".pdf"));
+                docFile.setTrashed(true);
             }
         }
-        for (var x = startIndex; x <= endIndex; x++) {
-            var firstPropertyValue = Object.values(dataObjects[x][0])[0];
-            var newDocument = DocumentApp.create("Merged Letter " + firstPropertyValue);
-            var newDocumentBody = newDocument.getBody();
-            newDocumentBody.setAttributes(body.getAttributes());
-            // Use preprocessed template elements
-            for (var k = 0; k < templateElements.length; k++) {
-                var item = templateElements[k];
-                if (item.type === 'paragraph') {
-                    processFormattedParagraph(item.element.asParagraph(), newDocumentBody, dataObjects[x]);
-                } else if (item.type === 'table') {
-                    try {
-                        processFormattedTable(item.element.asTable(), newDocumentBody, dataObjects[x], k);
-                    } catch (tableError) {
-                        newDocumentBody.appendParagraph("[Table placeholder]");
-                    }
-                }
-            }
-            removeEmptyFirstParagraph(newDocumentBody);
-            newDocument.saveAndClose();
-            var parentFolder = DriveApp.getFileById(newDocument.getId()).getParents().next();
-            var pdfBlob = DriveApp.getFileById(newDocument.getId()).getAs("application/pdf");
-            parentFolder.createFile(pdfBlob);
-            DriveApp.getFileById(newDocument.getId()).setTrashed(true);
-        }
-        return "PDF generation complete";
+
+        return folder.getUrl();
     } catch (error) {
         throw new Error(error && error.message ? error.message : String(error));
     }
+}
+
+function preprocessTemplateElements(body, numChildren) {
+    var elements = [];
+    for (var j = 0; j < numChildren; j++) {
+        var child = body.getChild(j);
+        var type = child.getType();
+        if (type === DocumentApp.ElementType.PARAGRAPH || type === DocumentApp.ElementType.TABLE) {
+            elements.push({
+                type: type,
+                element: child.copy(),
+                text: child.getText() // Cache text content
+            });
+        }
+    }
+    return elements;
+}
+
+function processTemplateElementsBatch(templateElements, targetBody, dataObject) {
+    templateElements.forEach((item, index) => {
+        if (item.type === DocumentApp.ElementType.PARAGRAPH) {
+            if (item.text.includes('{{')) { // Only process if contains placeholders
+                processFormattedParagraph(item.element.asParagraph(), targetBody, dataObject);
+            } else {
+                targetBody.appendParagraph(item.element);
+            }
+        } else if (item.type === DocumentApp.ElementType.TABLE) {
+            if (item.text.includes('{{')) { // Only process if contains placeholders
+                try {
+                    processFormattedTable(item.element.asTable(), targetBody, dataObject, index);
+                } catch (tableError) {
+                    targetBody.appendParagraph("[Table placeholder]");
+                }
+            } else {
+                targetBody.appendTable(item.element);
+            }
+        }
+    });
 }
 
 /**
@@ -317,29 +352,54 @@ function escapeRegexChars(str) {
 * Helper function to replace placeholders in text
 * @param {String} text - Text containing placeholders
 * @param {Object} dataObject - Data for replacements
-                                        * @returns {String} Text with placeholders replaced
+* @returns {String} Text with placeholders replaced
 */
 function replacePlaceholders(text, dataObject) {
+    // Early return if no placeholders are present
+    if (!text.includes('{{')) {
+        return text;
+    }
+
     var result = text;
+    // Cache for compiled regex patterns
+    var regexCache = {};
+    // Cache for formatted dates
+    var dateCache = {};
+
     for (var k = 0; k < dataObject.length; k++) {
         var obj = dataObject[k];
         for (var prop in obj) {
             if (obj.hasOwnProperty(prop)) {
                 var placeholder = "{{" + prop + "}}";
+                // Skip if placeholder isn't in the text
+                if (!result.includes(placeholder)) {
+                    continue;
+                }
+
                 var replacement = obj[prop];
 
                 if (obj[prop] instanceof Object) {
-                    var date = new Date(obj[prop]);
-                    replacement = ("0" + date.getDate()).slice(-2) +
-                        "/" +
-                        ("0" + (date.getMonth() + 1)).slice(-2) +
-                        "/" +
-                        date.getFullYear();
+                    // Use cached date format if available
+                    var dateKey = obj[prop].toString();
+                    if (!dateCache[dateKey]) {
+                        var date = new Date(obj[prop]);
+                        dateCache[dateKey] = ("0" + date.getDate()).slice(-2) +
+                            "/" +
+                            ("0" + (date.getMonth() + 1)).slice(-2) +
+                            "/" +
+                            date.getFullYear();
+                    }
+                    replacement = dateCache[dateKey];
+                }
+
+                // Use cached regex if available, otherwise create and cache it
+                if (!regexCache[placeholder]) {
+                    var escapedPlaceholder = escapeRegexChars(placeholder);
+                    regexCache[placeholder] = new RegExp(escapedPlaceholder, 'g');
                 }
 
                 // Use the escape function for regex-safe replacement
-                var escapedPlaceholder = escapeRegexChars(placeholder);
-                result = result.replace(new RegExp(escapedPlaceholder, 'g'), replacement);
+                result = result.replace(regexCache[placeholder], replacement);
             }
         }
     }
