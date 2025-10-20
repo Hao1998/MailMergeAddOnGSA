@@ -76,51 +76,99 @@ function getSheetData(sheetName) {
 
 }
 
-function getColumnValues(headerName, sheetName) {
-    // Add caching for repeated calls
-    const cacheKey = `${sheetName}_${headerName}_values`;
-    const cache = CacheService.getUserCache();
-    const cachedValues = cache.get(cacheKey);
+// function getColumnValues(headerName, sheetName) {
+//     const cacheKey = `${sheetName}_${headerName}_richvalues`;
+//     const cache = CacheService.getUserCache();
+//     const cachedValues = cache.get(cacheKey);
+//
+//     if (cachedValues) {
+//         return JSON.parse(cachedValues);
+//     }
+//
+//     const spreadsheetId = JSON.parse(PropertiesService.getUserProperties().getProperty('fileId'));
+//     const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+//
+//     if (!sheet) {
+//         throw new Error(`Sheet "${sheetName}" not found in spreadsheet.`);
+//     }
+//
+//     const lastRow = sheet.getLastRow();
+//     const lastCol = sheet.getLastColumn();
+//     const dataRange = sheet.getRange(1, 1, lastRow, lastCol);
+//
+//     const allData = dataRange.getValues();
+//     const allRichText = dataRange.getRichTextValues();
+//     const allFormats = dataRange.getNumberFormats();
+//     const allFontLines = dataRange.getFontLines(); // 🔧 NEW: Get strikethrough for ALL cells
+//
+//     const headers = allData[0].map((header, index) => {
+//         if (typeof header === 'number' && header % 1 === 0) {
+//             return Math.round(header).toString();
+//         }
+//         return header;
+//     });
+//
+//     const columnIndex = headers.indexOf(headerName);
+//     if (columnIndex === -1) {
+//         throw new Error(`Header "${headerName}" not found in spreadsheet headers!`);
+//     }
+//
+//     const values = [];
+//     for (let i = 1; i < allData.length; i++) {
+//         const cellValue = allData[i][columnIndex];
+//         const richTextValue = allRichText[i][columnIndex];
+//         const numberFormat = allFormats[i][columnIndex];
+//         const fontLine = allFontLines[i][columnIndex]; // 🔧 Get strikethrough for this cell
+//
+//         if (cellValue === "") continue;
+//
+//         const richText = richTextValue.getText();
+//
+//         if (richText) {
+//             // Rich text has content - use it with formatting
+//             values.push({
+//                 text: richText,
+//                 richText: serializeRichText(richTextValue)
+//             });
+//         } else if (cellValue) {
+//             // 🔧 Rich text is empty (number/date/percentage case)
+//             let displayValue = cellValue;
+//             if (numberFormat && numberFormat.includes('%') && typeof cellValue === 'number') {
+//                 displayValue = Math.round(cellValue * 100) + '%';
+//             }
+//
+//             // 🔧 Create synthetic rich text for formatted numbers with strikethrough
+//             let syntheticRichText = null;
+//             if (fontLine === 'line-through') {
+//                 syntheticRichText = {
+//                     text: displayValue.toString(),
+//                     runs: [{
+//                         startIndex: 0,
+//                         endIndex: displayValue.toString().length,
+//                         textStyle: {
+//                             bold: false,
+//                             italic: false,
+//                             underline: false,
+//                             strikethrough: true, // 🔧 Apply strikethrough from cell format
+//                             fontFamily: null,
+//                             fontSize: null,
+//                             foregroundColor: null
+//                         }
+//                     }]
+//                 };
+//             }
+//
+//             values.push({
+//                 text: displayValue.toString(),
+//                 richText: syntheticRichText
+//             });
+//         }
+//     }
+//
+//     cache.put(cacheKey, JSON.stringify(values), 360);
+//     return values;
+// }
 
-    if (cachedValues) {
-        return JSON.parse(cachedValues);
-    }
-
-    const spreadsheetId = JSON.parse(PropertiesService.getUserProperties().getProperty('fileId'));
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
-
-    if (!sheet) {
-        throw new Error(`Sheet "${sheetName}" not found in spreadsheet.`);
-    }
-
-    // Get all data at once instead of reading headers separately
-    const lastRow = sheet.getLastRow();
-    const lastCol = sheet.getLastColumn();
-    const allData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-
-    // Process headers in first row
-    const headers = allData[0].map((header, index) => {
-        if (typeof header === 'number' && header % 1 === 0) {
-            return Math.round(header).toString();
-        }
-        return header;
-    });
-
-    const columnIndex = headers.indexOf(headerName);
-    if (columnIndex === -1) {
-        throw new Error(`Header "${headerName}" not found in spreadsheet headers!`);
-    }
-
-    // Extract column values efficiently
-    const values = allData.slice(1) // Skip header row
-        .map(row => row[columnIndex])
-        .filter(value => value !== "");
-
-    // Cache the results for 6 minutes
-    cache.put(cacheKey, JSON.stringify(values), 360);
-
-    return values;
-}
 
 
 function clearFilesFromPropServ() {
