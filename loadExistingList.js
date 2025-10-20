@@ -1,8 +1,10 @@
-// const URL =
-//     "https://script.google.com/a/macros/zoi.kaercher.com/s/AKfycbz14Mw-sJAjQ70eiFWifXJc3072fEIQjoLeAQtxMqel7NsTwJGs4_TfTgPkmZkI5wQ6qQ/exec";
-
 const URL =
-    "https://script.google.com/a/macros/zoi.kaercher.com/s/AKfycbzp9Dt9RcsJyc4Ijq6Xco0HVWHII6atY6ToFbRFUr4T/dev";
+    "https://script.google.com/a/macros/zoi.kaercher.com/s/AKfycbwF7C0x40rn_c-ZRMBMDhKgzKii71QbCy7CL0qxRfmPq_TsK0zV2vSBhTRnULb4cd8a3w/exec";
+
+// const URL =
+//     "https://script.google.com/a/macros/zoi.kaercher.com/s/AKfycbzp9Dt9RcsJyc4Ijq6Xco0HVWHII6atY6ToFbRFUr4T/dev";
+
+
 var sheetName = undefined;
 var SHEET_NAME = "";
 
@@ -263,7 +265,7 @@ function addValuesFunction(sheetName, fileId, startIndex, endIndex, pdf) {
     );
 
     var formattedValues = convertToNestedArray(values, fieldsToFormat);
-
+    // console.log("Formatted Values:", formattedValues);
     PropertiesService.getUserProperties().deleteProperty("fields");
 
     copyAndUpdateDoc2(formattedValues, fileId, startIndex, endIndex, pdf);
